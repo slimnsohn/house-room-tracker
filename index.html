@@ -1100,7 +1100,7 @@
 
     // ── RoomCard ─────────────────────────────────────────────────────────
     function RoomCard(props) {
-      var room = props.room, items = props.items, onTap = props.onTap, style = props.style;
+      var room = props.room, items = props.items, onAddItem = props.onAddItem, style = props.style;
       var roomItems = items.filter(function(i) { return i.room_id === room.id; });
       var total = roomItems.length;
       var completed = roomItems.filter(function(i) { return i.status === 'completed'; }).length;
@@ -1118,7 +1118,7 @@
         background: 'linear-gradient(180deg, ' + colors.bg + ' 0%, var(--surface) 40%)'
       });
 
-      return h('div', { className: 'room-card', onClick: onTap, style: cardStyle },
+      return h('div', { className: 'room-card', style: cardStyle },
         imgUrl
           ? h('img', { className: 'room-card-hero', src: imgUrl, alt: room.name, loading: 'lazy' })
           : h('div', { className: 'room-card-hero-placeholder' }, room.name ? room.name[0] : '?'),
@@ -1135,7 +1135,17 @@
             h('span', null, h('span', { className: 'stat-value' }, completed), '/' + total + ' done'),
             mustDos > 0 && h('span', null, h('span', { className: 'stat-value must-do-count' }, mustDos), ' must-do'),
             costRemaining > 0 && h('span', null, h('span', { className: 'stat-value' }, formatCost(costRemaining)), ' est.')
-          )
+          ),
+          h('button', {
+            className: 'add-note-btn',
+            onClick: function(e) { e.stopPropagation(); onAddItem && onAddItem(); },
+            style: {
+              width: '100%', marginTop: '12px', padding: '10px',
+              background: 'rgba(74,140,255,0.1)', border: '1px dashed rgba(74,140,255,0.3)',
+              borderRadius: '10px', color: '#4a8cff', fontSize: '13px', fontWeight: '600',
+              fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
+            }
+          }, '+ Add Note')
         ),
         (function() {
           var openItems = roomItems.filter(function(i) { return i.status !== 'completed'; }).slice(0, 4);
@@ -1221,7 +1231,7 @@
 
     // ── Carousel (Property Scout-style animation) ─────────────────────
     function Carousel(props) {
-      var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom;
+      var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom, onAddItem = props.onAddItem, categories = props.categories;
       var _idx = useState(0), idx = _idx[0], setIdx = _idx[1];
       var _offset = useState(0), dragOffset = _offset[0], setDragOffset = _offset[1];
       var _animating = useState(false), animating = _animating[0], setAnimating = _animating[1];
@@ -1245,13 +1255,12 @@
       function swipeNav(dir) {
         if (animating) return;
         setAnimating(true);
-        // Slide card off-screen
-        setDragOffset(dir === 'left' ? -300 : 300);
+        setDragOffset(dir === 'left' ? -250 : 250);
         setTimeout(function() {
-          setDragOffset(0);
           goTo(dir === 'left' ? idx + 1 : idx - 1);
-          setAnimating(false);
-        }, 250);
+          setDragOffset(0);
+          setTimeout(function() { setAnimating(false); }, 50);
+        }, 150);
       }
 
       var handleStart = useCallback(function(e) {
@@ -1306,7 +1315,7 @@
       var cardStyle = {
         transform: 'translateX(' + dragOffset + 'px) rotate(' + (dragOffset * 0.03) + 'deg)',
         opacity: Math.max(0.5, 1 - Math.abs(dragOffset) / 500),
-        transition: (isDragging.current && isHorizontal.current) ? 'none' : 'all 0.25s ease-out'
+        transition: (isDragging.current && isHorizontal.current) ? 'none' : 'all 0.15s ease-out'
       };
 
       return h('div', { className: 'carousel-container' },
@@ -1332,7 +1341,8 @@
           h(RoomCard, {
             room: rooms[idx],
             items: items,
-            onTap: function() { if (!animating && Math.abs(dragOffset) < 5) onSelectRoom(rooms[idx]); }
+            categories: categories,
+            onAddItem: function() { if (!animating) onAddItem(rooms[idx]); }
           })
         ),
         h(DotScrubber, { rooms: rooms, idx: idx, onIndexChange: function(i) { if (!animating) { setAnimating(false); setIdx(i); } } })
@@ -1773,6 +1783,98 @@
     }
 
     // ── App ──────────────────────────────────────────────────────────────
+    // ── AddNoteModal ─────────────────────────────────────────────────────
+    function AddNoteModal(props) {
+      var room = props.room, categories = props.categories, onAdd = props.onAdd, onClose = props.onClose;
+      var _desc = useState(''), desc = _desc[0], setDesc = _desc[1];
+      var _cat = useState('Other'), cat = _cat[0], setCat = _cat[1];
+      var _pri = useState('should'), pri = _pri[0], setPri = _pri[1];
+      var _cost = useState(''), cost = _cost[0], setCost = _cost[1];
+      var _notes = useState(''), notes = _notes[0], setNotes = _notes[1];
+      var inputRef = useRef(null);
+
+      useEffect(function() {
+        if (inputRef.current) inputRef.current.focus();
+      }, []);
+
+      var catNames = Object.keys(categories);
+      var colors = ROOM_COLORS[getRoomType(room.name)];
+
+      function submit() {
+        if (!desc.trim()) return;
+        var item = {
+          item_id: uuid(),
+          room_id: room.room_id || room.id,
+          category: cat,
+          description: desc.trim(),
+          status: 'not_started',
+          priority: pri,
+          cost_estimate: cost || '',
+          cost_actual: '',
+          vendor: '',
+          notes: notes,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        onAdd(item);
+        setDesc('');
+        setNotes('');
+        setCost('');
+        if (inputRef.current) inputRef.current.focus();
+      }
+
+      return h('div', { className: 'modal-overlay', onClick: onClose },
+        h('div', { className: 'modal-sheet', onClick: function(e) { e.stopPropagation(); } },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+            h('h2', { style: { fontFamily: "'Playfair Display', serif", fontSize: '20px', margin: 0 } },
+              h('span', { style: { color: colors.accent } }, room.name),
+              ' \u2014 Add Note'
+            ),
+            h('button', { style: { background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '8px' }, onClick: onClose }, '\u2715')
+          ),
+          h('div', { className: 'form-field' },
+            h('label', null, 'What needs to be done?'),
+            h('input', { ref: inputRef, value: desc, placeholder: 'e.g. Replace light switch with dimmer',
+              onChange: function(e) { setDesc(e.target.value); },
+              onKeyDown: function(e) { if (e.key === 'Enter' && desc.trim()) submit(); }
+            })
+          ),
+          h('div', { style: { display: 'flex', gap: '10px' } },
+            h('div', { className: 'form-field', style: { flex: 1 } },
+              h('label', null, 'Category'),
+              h('select', { value: cat, onChange: function(e) { setCat(e.target.value); } },
+                catNames.map(function(c) {
+                  return h('option', { key: c, value: c }, (categories[c].icon_emoji || '') + ' ' + c);
+                })
+              )
+            ),
+            h('div', { className: 'form-field', style: { flex: 1 } },
+              h('label', null, 'Priority'),
+              h('select', { value: pri, onChange: function(e) { setPri(e.target.value); } },
+                ['must', 'should', 'nice'].map(function(p) {
+                  return h('option', { key: p, value: p }, p);
+                })
+              )
+            )
+          ),
+          h('div', { style: { display: 'flex', gap: '10px' } },
+            h('div', { className: 'form-field', style: { flex: 1 } },
+              h('label', null, 'Est. Cost'),
+              h('input', { type: 'number', value: cost, placeholder: '0', onChange: function(e) { setCost(e.target.value); } })
+            ),
+            h('div', { className: 'form-field', style: { flex: 1 } },
+              h('label', null, 'Notes'),
+              h('input', { value: notes, placeholder: 'Optional notes', onChange: function(e) { setNotes(e.target.value); } })
+            )
+          ),
+          h('div', { className: 'form-actions' },
+            h('button', { className: 'btn-secondary', onClick: onClose }, 'Done'),
+            h('button', { className: 'btn-primary', onClick: submit }, '+ Add')
+          )
+        )
+      );
+    }
+
     // ── AllItemsView ─────────────────────────────────────────────────────
     function AllItemsView(props) {
       var rooms = props.rooms, items = props.items, categories = props.categories;
@@ -1876,6 +1978,8 @@
       var showSettings = _showSettings[0], setShowSettings = _showSettings[1];
       var _showAll = useState(false);
       var showAll = _showAll[0], setShowAll = _showAll[1];
+      var _addingRoom = useState(null);
+      var addingRoom = _addingRoom[0], setAddingRoom = _addingRoom[1];
 
       var loadData = useCallback(function() {
         setLoading(true);
@@ -1981,6 +2085,8 @@
             key: 'carousel',
             rooms: rooms,
             items: items,
+            categories: categories,
+            onAddItem: function(room) { setAddingRoom(room); },
             onSelectRoom: function(r) { setSelectedRoom(r); }
           })
         ];
@@ -1996,7 +2102,18 @@
             ),
             h(SettingsView, { lastSync: lastSync, onRefresh: loadData })
           )
-        )
+        ),
+        addingRoom && h(AddNoteModal, {
+          room: addingRoom,
+          categories: categories,
+          onAdd: function(item) {
+            setItems(function(list) { return list.concat([item]); });
+            api.createItem(item).catch(function(err) {
+              setItems(function(list) { return list.filter(function(i) { return (i.item_id || i.id) !== (item.item_id || item.id); }); });
+            });
+          },
+          onClose: function() { setAddingRoom(null); }
+        })
       );
     }
 
