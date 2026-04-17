@@ -1049,7 +1049,7 @@
         .filter(function(i) { return i.status !== 'completed'; })
         .reduce(function(sum, i) { return sum + (Number(i.cost_estimate) || 0); }, 0);
 
-      var imgUrl = getDriveImageUrl(room.image_url);
+      var imgUrl = getDriveImageUrl(room.photo_url);
       var roomType = getRoomType(room.name);
       var colors = ROOM_COLORS[roomType];
       var cardStyle = Object.assign({}, style || {}, {
