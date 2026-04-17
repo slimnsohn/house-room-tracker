@@ -1785,11 +1785,9 @@
     // ── App ──────────────────────────────────────────────────────────────
     // ── AddNoteModal ─────────────────────────────────────────────────────
     function AddNoteModal(props) {
-      var room = props.room, categories = props.categories, onAdd = props.onAdd, onClose = props.onClose;
+      var room = props.room, onAdd = props.onAdd, onClose = props.onClose;
       var _desc = useState(''), desc = _desc[0], setDesc = _desc[1];
-      var _cat = useState('Other'), cat = _cat[0], setCat = _cat[1];
       var _pri = useState('should'), pri = _pri[0], setPri = _pri[1];
-      var _cost = useState(''), cost = _cost[0], setCost = _cost[1];
       var _notes = useState(''), notes = _notes[0], setNotes = _notes[1];
       var inputRef = useRef(null);
 
@@ -1797,19 +1795,23 @@
         if (inputRef.current) inputRef.current.focus();
       }, []);
 
-      var catNames = Object.keys(categories);
       var colors = ROOM_COLORS[getRoomType(room.name)];
+      var priorities = [
+        { key: 'must', label: 'Must', color: '#f85149', bg: 'rgba(248,81,73,0.15)' },
+        { key: 'should', label: 'Should', color: '#d29922', bg: 'rgba(210,153,34,0.15)' },
+        { key: 'nice', label: 'Nice', color: '#3fb950', bg: 'rgba(63,185,80,0.15)' }
+      ];
 
       function submit() {
         if (!desc.trim()) return;
         var item = {
           item_id: uuid(),
           room_id: room.room_id || room.id,
-          category: cat,
+          category: '',
           description: desc.trim(),
           status: 'not_started',
           priority: pri,
-          cost_estimate: cost || '',
+          cost_estimate: '',
           cost_actual: '',
           vendor: '',
           notes: notes,
@@ -1819,7 +1821,6 @@
         onAdd(item);
         setDesc('');
         setNotes('');
-        setCost('');
         if (inputRef.current) inputRef.current.focus();
       }
 
@@ -1827,8 +1828,7 @@
         h('div', { className: 'modal-sheet', onClick: function(e) { e.stopPropagation(); } },
           h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
             h('h2', { style: { fontFamily: "'Playfair Display', serif", fontSize: '20px', margin: 0 } },
-              h('span', { style: { color: colors.accent } }, room.name),
-              ' \u2014 Add Note'
+              h('span', { style: { color: colors.accent } }, room.name)
             ),
             h('button', { style: { background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '8px' }, onClick: onClose }, '\u2715')
           ),
@@ -1839,37 +1839,34 @@
               onKeyDown: function(e) { if (e.key === 'Enter' && desc.trim()) submit(); }
             })
           ),
-          h('div', { style: { display: 'flex', gap: '10px' } },
-            h('div', { className: 'form-field', style: { flex: 1 } },
-              h('label', null, 'Category'),
-              h('select', { value: cat, onChange: function(e) { setCat(e.target.value); } },
-                catNames.map(function(c) {
-                  return h('option', { key: c, value: c }, (categories[c].icon_emoji || '') + ' ' + c);
-                })
-              )
-            ),
-            h('div', { className: 'form-field', style: { flex: 1 } },
-              h('label', null, 'Priority'),
-              h('select', { value: pri, onChange: function(e) { setPri(e.target.value); } },
-                ['must', 'should', 'nice'].map(function(p) {
-                  return h('option', { key: p, value: p }, p);
-                })
-              )
+          h('div', { className: 'form-field' },
+            h('label', null, 'Notes (optional)'),
+            h('input', { value: notes, placeholder: 'Any extra details',
+              onChange: function(e) { setNotes(e.target.value); }
+            })
+          ),
+          h('div', { className: 'form-field' },
+            h('label', null, 'Priority'),
+            h('div', { style: { display: 'flex', gap: '8px', marginTop: '6px' } },
+              priorities.map(function(p) {
+                var isActive = pri === p.key;
+                return h('button', {
+                  key: p.key,
+                  onClick: function() { setPri(p.key); },
+                  style: {
+                    flex: 1, padding: '10px 0', borderRadius: '10px', fontSize: '14px',
+                    fontWeight: '600', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer',
+                    minHeight: '44px', border: '2px solid ' + (isActive ? p.color : 'var(--border)'),
+                    background: isActive ? p.bg : 'transparent',
+                    color: isActive ? p.color : 'var(--text-secondary)'
+                  }
+                }, p.label);
+              })
             )
           ),
-          h('div', { style: { display: 'flex', gap: '10px' } },
-            h('div', { className: 'form-field', style: { flex: 1 } },
-              h('label', null, 'Est. Cost'),
-              h('input', { type: 'number', value: cost, placeholder: '0', onChange: function(e) { setCost(e.target.value); } })
-            ),
-            h('div', { className: 'form-field', style: { flex: 1 } },
-              h('label', null, 'Notes'),
-              h('input', { value: notes, placeholder: 'Optional notes', onChange: function(e) { setNotes(e.target.value); } })
-            )
-          ),
-          h('div', { className: 'form-actions' },
-            h('button', { className: 'btn-secondary', onClick: onClose }, 'Done'),
-            h('button', { className: 'btn-primary', onClick: submit }, '+ Add')
+          h('div', { className: 'form-actions', style: { marginTop: '20px' } },
+            h('button', { className: 'btn-secondary', onClick: onClose, style: { fontSize: '15px' } }, 'Cancel'),
+            h('button', { className: 'btn-primary', onClick: submit, style: { fontSize: '15px' } }, 'Add Item')
           )
         )
       );
