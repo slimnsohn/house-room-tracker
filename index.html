@@ -103,7 +103,12 @@
     .app-header {
       padding: 16px 20px 8px;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
+
+    .app-header-left {}
 
     .app-header h1 {
       font-family: 'Playfair Display', serif;
@@ -116,6 +121,64 @@
       font-size: 13px;
       color: var(--text-secondary);
       margin-top: 2px;
+    }
+
+    .gear-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 8px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    .room-card-items-preview {
+      border-top: 1px solid var(--border);
+      padding: 10px 20px 14px;
+      max-height: 140px;
+      overflow: hidden;
+    }
+
+    .room-card-items-preview .preview-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .preview-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .preview-item .preview-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .preview-item .preview-text {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .preview-more {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-top: 4px;
     }
 
     /* Carousel */
@@ -139,9 +202,7 @@
       transition: none;
     }
 
-    .carousel-card-wrapper.snapping {
-      transition: transform 0.3s ease, opacity 0.3s ease;
-    }
+    /* transition handled inline via Property Scout animation pattern */
 
     .room-card {
       background: var(--surface);
@@ -152,7 +213,7 @@
 
     .room-card-hero {
       width: 100%;
-      height: 200px;
+      height: 140px;
       object-fit: cover;
       display: block;
       background: var(--surface-2);
@@ -160,7 +221,7 @@
 
     .room-card-hero-placeholder {
       width: 100%;
-      height: 200px;
+      height: 140px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1075,8 +1136,23 @@
             mustDos > 0 && h('span', null, h('span', { className: 'stat-value must-do-count' }, mustDos), ' must-do'),
             costRemaining > 0 && h('span', null, h('span', { className: 'stat-value' }, formatCost(costRemaining)), ' est.')
           )
-        )
-      );
+        ),
+        (function() {
+          var openItems = roomItems.filter(function(i) { return i.status !== 'completed'; }).slice(0, 4);
+          if (openItems.length === 0 && total === 0) return null;
+          var remaining = roomItems.filter(function(i) { return i.status !== 'completed'; }).length - 4;
+          var priorityColors = { must: '#f85149', should: '#d29922', nice: '#3fb950' };
+          return h('div', { className: 'room-card-items-preview' },
+            h('div', { className: 'preview-label' }, openItems.length > 0 ? 'Open items' : 'All done!'),
+            openItems.map(function(item) {
+              return h('div', { key: item.item_id || item.id, className: 'preview-item' },
+                h('span', { className: 'preview-dot', style: { background: priorityColors[item.priority] || '#555' } }),
+                h('span', { className: 'preview-text' }, item.description)
+              );
+            }),
+            remaining > 0 && h('div', { className: 'preview-more' }, '+' + remaining + ' more')
+          );
+        })()
     }
 
     // ── DotScrubber ───────────────────────────────────────────────────────
@@ -1142,12 +1218,12 @@
       );
     }
 
-    // ── Carousel ─────────────────────────────────────────────────────────
+    // ── Carousel (Property Scout-style animation) ─────────────────────
     function Carousel(props) {
       var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom;
       var _idx = useState(0), idx = _idx[0], setIdx = _idx[1];
       var _offset = useState(0), dragOffset = _offset[0], setDragOffset = _offset[1];
-      var _snapping = useState(false), snapping = _snapping[0], setSnapping = _snapping[1];
+      var _animating = useState(false), animating = _animating[0], setAnimating = _animating[1];
 
       var isDragging = useRef(false);
       var startX = useRef(0);
@@ -1155,23 +1231,40 @@
       var currentX = useRef(0);
       var isHorizontal = useRef(null);
 
-      // Clamp idx if rooms change
       useEffect(function() {
         if (idx >= rooms.length && rooms.length > 0) setIdx(rooms.length - 1);
       }, [rooms.length]);
 
+      function goTo(newIdx) {
+        if (newIdx < 0) newIdx = rooms.length - 1;
+        if (newIdx >= rooms.length) newIdx = 0;
+        setIdx(newIdx);
+      }
+
+      function swipeNav(dir) {
+        if (animating) return;
+        setAnimating(true);
+        // Slide card off-screen
+        setDragOffset(dir === 'left' ? -300 : 300);
+        setTimeout(function() {
+          setDragOffset(0);
+          goTo(dir === 'left' ? idx + 1 : idx - 1);
+          setAnimating(false);
+        }, 250);
+      }
+
       var handleStart = useCallback(function(e) {
+        if (animating) return;
         var touch = e.touches ? e.touches[0] : e;
         startX.current = touch.clientX;
         startY.current = touch.clientY;
         currentX.current = touch.clientX;
         isDragging.current = true;
         isHorizontal.current = null;
-        setSnapping(false);
-      }, []);
+      }, [animating]);
 
       var handleMove = useCallback(function(e) {
-        if (!isDragging.current) return;
+        if (!isDragging.current || animating) return;
         var touch = e.touches ? e.touches[0] : e;
         var dx = touch.clientX - startX.current;
         var dy = touch.clientY - startY.current;
@@ -1184,28 +1277,23 @@
         }
 
         if (!isHorizontal.current) return;
-
         if (e.cancelable) e.preventDefault();
         currentX.current = touch.clientX;
         setDragOffset(dx);
-      }, []);
+      }, [animating]);
 
       var handleEnd = useCallback(function() {
-        if (!isDragging.current) return;
+        if (!isDragging.current || animating) return;
         isDragging.current = false;
-        var dx = currentX.current - startX.current;
+        var diff = currentX.current - startX.current;
 
-        if (isHorizontal.current && Math.abs(dx) > 60) {
-          if (dx < 0) {
-            setIdx(function(i) { return i < rooms.length - 1 ? i + 1 : 0; });
-          } else {
-            setIdx(function(i) { return i > 0 ? i - 1 : rooms.length - 1; });
-          }
+        if (isHorizontal.current && Math.abs(diff) > 60) {
+          if (diff < 0) { swipeNav('left'); return; }
+          else { swipeNav('right'); return; }
         }
-
-        setSnapping(true);
+        isHorizontal.current = null;
         setDragOffset(0);
-      }, [idx, rooms.length]);
+      }, [idx, rooms.length, animating]);
 
       if (rooms.length === 0) {
         return h('div', { className: 'empty-state' },
@@ -1216,20 +1304,21 @@
 
       var cardStyle = {
         transform: 'translateX(' + dragOffset + 'px) rotate(' + (dragOffset * 0.03) + 'deg)',
-        opacity: 1 - Math.abs(dragOffset) * 0.001
+        opacity: Math.max(0.5, 1 - Math.abs(dragOffset) / 500),
+        transition: (isDragging.current && isHorizontal.current) ? 'none' : 'all 0.25s ease-out'
       };
 
       return h('div', { className: 'carousel-container' },
         rooms.length > 1 && h('button', {
           className: 'nav-arrow left',
-          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx > 0 ? idx - 1 : rooms.length - 1); }
+          onClick: function(e) { e.stopPropagation(); swipeNav('right'); }
         }, '\u2039'),
         rooms.length > 1 && h('button', {
           className: 'nav-arrow right',
-          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx < rooms.length - 1 ? idx + 1 : 0); }
+          onClick: function(e) { e.stopPropagation(); swipeNav('left'); }
         }, '\u203A'),
         h('div', {
-          className: 'carousel-card-wrapper' + (snapping ? ' snapping' : ''),
+          className: 'carousel-card-wrapper',
           style: cardStyle,
           onMouseDown: handleStart,
           onMouseMove: handleMove,
@@ -1242,10 +1331,10 @@
           h(RoomCard, {
             room: rooms[idx],
             items: items,
-            onTap: function() { onSelectRoom(rooms[idx]); }
+            onTap: function() { if (!animating && Math.abs(dragOffset) < 5) onSelectRoom(rooms[idx]); }
           })
         ),
-        h(DotScrubber, { rooms: rooms, idx: idx, onIndexChange: function(i) { setSnapping(true); setIdx(i); } })
+        h(DotScrubber, { rooms: rooms, idx: idx, onIndexChange: function(i) { if (!animating) { setAnimating(false); setIdx(i); } } })
       );
     }
 
@@ -1683,9 +1772,91 @@
     }
 
     // ── App ──────────────────────────────────────────────────────────────
+    // ── AllItemsView ─────────────────────────────────────────────────────
+    function AllItemsView(props) {
+      var rooms = props.rooms, items = props.items, categories = props.categories;
+      var onBack = props.onBack, onItemsChanged = props.onItemsChanged;
+      var _toast = useState(null), toast = _toast[0], setToast = _toast[1];
+
+      function showToast(msg) {
+        setToast(msg);
+        setTimeout(function() { setToast(null); }, 2500);
+      }
+
+      function toggleItem(item) {
+        var newStatus = item.status === 'completed' ? 'not_started' : 'completed';
+        onItemsChanged(item.item_id || item.id, { status: newStatus });
+        api.updateItem(item.item_id || item.id, { status: newStatus }).catch(function(err) {
+          showToast('Failed: ' + err.message);
+        });
+      }
+
+      // Build room map
+      var roomMap = {};
+      rooms.forEach(function(r) { roomMap[r.room_id || r.id] = r; });
+
+      return h('div', { className: 'room-detail' },
+        h('div', { className: 'room-detail-header' },
+          h('button', { className: 'back-btn', onClick: onBack }, '\u2190'),
+          h('span', { className: 'room-detail-title' }, 'All Items'),
+          h('span', { style: { fontFamily: "'DM Mono', monospace", fontSize: '13px', color: 'var(--text-secondary)', marginLeft: 'auto' } },
+            items.filter(function(i) { return i.status !== 'completed'; }).length + ' open'
+          )
+        ),
+        h('div', { className: 'item-list', style: { padding: '16px' } },
+          rooms.map(function(room) {
+            var roomId = room.room_id || room.id;
+            var roomItems = items.filter(function(i) { return (i.room_id || '') === roomId && i.status !== 'completed'; });
+            if (roomItems.length === 0) return null;
+            var colors = ROOM_COLORS[getRoomType(room.name)];
+            return h('div', { key: roomId, style: { marginBottom: '20px' } },
+              h('div', { style: {
+                fontSize: '14px', fontWeight: '600', color: colors.accent,
+                marginBottom: '8px', paddingBottom: '6px',
+                borderBottom: '1px solid ' + colors.border,
+                display: 'flex', alignItems: 'center', gap: '8px'
+              } },
+                h('span', null, room.name),
+                h('span', { style: { fontSize: '12px', color: 'var(--text-muted)', fontWeight: '400' } }, roomItems.length + ' items')
+              ),
+              roomItems.map(function(item) {
+                var cat = categories[item.category] || {};
+                var priorityColors = { must: '#f85149', should: '#d29922', nice: '#3fb950' };
+                return h('div', { key: item.item_id || item.id, style: {
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  padding: '10px 12px', background: 'var(--surface)',
+                  borderRadius: '10px', marginBottom: '6px'
+                } },
+                  h('button', {
+                    className: 'checkbox',
+                    onClick: function() { toggleItem(item); }
+                  }),
+                  h('div', { style: { flex: 1, minWidth: 0 } },
+                    h('div', { style: { fontSize: '14px', color: 'var(--text)' } }, item.description),
+                    item.notes && h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' } }, item.notes),
+                    h('div', { style: { display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' } },
+                      item.category && h('span', { className: 'chip category' }, (cat.icon_emoji || '') + ' ' + item.category),
+                      item.priority && h('span', { className: 'chip priority-' + item.priority }, item.priority),
+                      item.cost_estimate && h('span', { style: { fontSize: '12px', fontFamily: "'DM Mono', monospace", color: 'var(--text-muted)' } }, formatCost(item.cost_estimate))
+                    )
+                  ),
+                  h('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: priorityColors[item.priority] || '#555', flexShrink: 0, marginTop: '6px' } })
+                );
+              })
+            );
+          }),
+          items.filter(function(i) { return i.status !== 'completed'; }).length === 0 &&
+            h('div', { style: { textAlign: 'center', padding: '40px', color: 'var(--text-muted)' } },
+              h('div', { style: { fontSize: '32px', marginBottom: '12px' } }, '\u2705'),
+              'All items complete!'
+            )
+        ),
+        toast && h('div', { className: 'toast' }, toast)
+      );
+    }
+
     function App() {
-      var _tab = useState('rooms');
-      var tab = _tab[0], setTab = _tab[1];
+      // tab state removed — no bottom tab bar
       var _rooms = useState([]);
       var rooms = _rooms[0], setRooms = _rooms[1];
       var _items = useState([]);
@@ -1700,6 +1871,10 @@
       var error = _error[0], setError = _error[1];
       var _lastSync = useState(null);
       var lastSync = _lastSync[0], setLastSync = _lastSync[1];
+      var _showSettings = useState(false);
+      var showSettings = _showSettings[0], setShowSettings = _showSettings[1];
+      var _showAll = useState(false);
+      var showAll = _showAll[0], setShowAll = _showAll[1];
 
       var loadData = useCallback(function() {
         setLoading(true);
@@ -1773,48 +1948,52 @@
           h('div', { className: 'error-msg' }, error),
           h('button', { className: 'retry-btn', onClick: loadData }, 'Retry')
         );
-      } else if (tab === 'rooms') {
-        if (selectedRoom) {
-          content = h(RoomDetail, {
-            room: selectedRoom,
-            items: items,
-            categories: categories,
-            onBack: function() { setSelectedRoom(null); },
-            onItemsChanged: handleItemsChanged
-          });
-        } else {
-          content = [
-            h('div', { key: 'header', className: 'app-header' },
+      } else if (showAll) {
+        content = h(AllItemsView, {
+          rooms: rooms,
+          items: items,
+          categories: categories,
+          onBack: function() { setShowAll(false); },
+          onItemsChanged: handleItemsChanged
+        });
+      } else if (selectedRoom) {
+        content = h(RoomDetail, {
+          room: selectedRoom,
+          items: items,
+          categories: categories,
+          onBack: function() { setSelectedRoom(null); },
+          onItemsChanged: handleItemsChanged
+        });
+      } else {
+        content = [
+          h('div', { key: 'header', className: 'app-header' },
+            h('div', { className: 'app-header-left' },
               h('h1', null, 'Maple'),
               h('div', { className: 'subtitle' }, rooms.length + ' rooms \u00B7 ' + items.filter(function(i) { return i.status !== 'completed'; }).length + ' open items')
             ),
-            h(Carousel, {
-              key: 'carousel',
-              rooms: rooms,
-              items: items,
-              onSelectRoom: function(r) { setSelectedRoom(r); }
-            })
-          ];
-        }
-      } else if (tab === 'settings') {
-        content = [
-          h('div', { key: 'header', className: 'app-header' },
-            h('h1', null, 'Settings')
+            h('div', { key: 'actions', style: { display: 'flex', gap: '4px' } },
+              h('button', { className: 'gear-btn', onClick: function() { setShowAll(true); }, title: 'All items' }, '\uD83D\uDCCB'),
+              h('button', { className: 'gear-btn', onClick: function() { setShowSettings(true); }, title: 'Settings' }, '\u2699\uFE0F')
+            )
           ),
-          h(SettingsView, { key: 'settings', lastSync: lastSync, onRefresh: loadData })
+          h(Carousel, {
+            key: 'carousel',
+            rooms: rooms,
+            items: items,
+            onSelectRoom: function(r) { setSelectedRoom(r); }
+          })
         ];
       }
 
       return h('div', { className: 'app' },
         content,
-        h('div', { className: 'tab-bar' },
-          h('button', { className: 'tab-btn' + (tab === 'rooms' ? ' active' : ''), onClick: function() { setTab('rooms'); setSelectedRoom(null); } },
-            h('span', { className: 'tab-icon' }, '\uD83C\uDFE0'),
-            h('span', { className: 'tab-label' }, 'Rooms')
-          ),
-          h('button', { className: 'tab-btn' + (tab === 'settings' ? ' active' : ''), onClick: function() { setTab('settings'); } },
-            h('span', { className: 'tab-icon' }, '\u2699\uFE0F'),
-            h('span', { className: 'tab-label' }, 'Settings')
+        showSettings && h('div', { className: 'modal-overlay', onClick: function() { setShowSettings(false); } },
+          h('div', { className: 'modal-sheet', onClick: function(e) { e.stopPropagation(); } },
+            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+              h('h2', { style: { fontFamily: "'Playfair Display', serif", fontSize: '20px', margin: 0 } }, 'Settings'),
+              h('button', { style: { background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '8px' }, onClick: function() { setShowSettings(false); } }, '\u2715')
+            ),
+            h(SettingsView, { lastSync: lastSync, onRefresh: loadData })
           )
         )
       );
