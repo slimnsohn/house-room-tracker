@@ -1113,7 +1113,7 @@
 
     // ── RoomCard ─────────────────────────────────────────────────────────
     function RoomCard(props) {
-      var room = props.room, items = props.items, onAddItem = props.onAddItem, style = props.style;
+      var room = props.room, items = props.items, onAddItem = props.onAddItem, onEditList = props.onEditList, style = props.style;
       var roomItems = items.filter(function(i) { return i.room_id === room.room_id; });
       var total = roomItems.length;
       var completed = roomItems.filter(function(i) { return i.status === 'completed'; }).length;
@@ -1149,16 +1149,26 @@
             mustDos > 0 && h('span', null, h('span', { className: 'stat-value must-do-count' }, mustDos), ' must-do'),
             costRemaining > 0 && h('span', null, h('span', { className: 'stat-value' }, formatCost(costRemaining)), ' est.')
           ),
-          h('button', {
-            className: 'add-note-btn',
-            onClick: function(e) { e.stopPropagation(); onAddItem && onAddItem(); },
-            style: {
-              width: '100%', marginTop: '12px', padding: '10px',
-              background: 'rgba(74,140,255,0.1)', border: '1px dashed rgba(74,140,255,0.3)',
-              borderRadius: '10px', color: '#4a8cff', fontSize: '13px', fontWeight: '600',
-              fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
-            }
-          }, '+ Add Note')
+          h('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } },
+            h('button', {
+              onClick: function(e) { e.stopPropagation(); onAddItem && onAddItem(); },
+              style: {
+                flex: 1, padding: '10px',
+                background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)',
+                borderRadius: '10px', color: '#3fb950', fontSize: '13px', fontWeight: '600',
+                fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
+              }
+            }, '+ Add Note'),
+            h('button', {
+              onClick: function(e) { e.stopPropagation(); onEditList && onEditList(); },
+              style: {
+                flex: 1, padding: '10px',
+                background: 'rgba(74,140,255,0.1)', border: '1px solid rgba(74,140,255,0.3)',
+                borderRadius: '10px', color: '#4a8cff', fontSize: '13px', fontWeight: '600',
+                fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
+              }
+            }, '\u270F Edit List')
+          )
         ),
         (function() {
           var openItems = roomItems.filter(function(i) { return i.status !== 'completed'; }).slice(0, 8);
@@ -1244,7 +1254,7 @@
 
     // ── Carousel (Property Scout-style animation) ─────────────────────
     function Carousel(props) {
-      var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom, onAddItem = props.onAddItem, categories = props.categories;
+      var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom, onAddItem = props.onAddItem, onEditList = props.onEditList, categories = props.categories;
       var _idx = useState(0), idx = _idx[0], setIdx = _idx[1];
       var _offset = useState(0), dragOffset = _offset[0], setDragOffset = _offset[1];
       var _animating = useState(false), animating = _animating[0], setAnimating = _animating[1];
@@ -1355,7 +1365,8 @@
             room: rooms[idx],
             items: items,
             categories: categories,
-            onAddItem: function() { if (!animating) onAddItem(rooms[idx]); }
+            onAddItem: function() { if (!animating) onAddItem(rooms[idx]); },
+            onEditList: function() { if (!animating) onEditList(rooms[idx]); }
           })
         ),
         h(DotScrubber, { rooms: rooms, idx: idx, onIndexChange: function(i) { if (!animating) { setAnimating(false); setIdx(i); } } })
@@ -2190,6 +2201,7 @@
             items: items,
             categories: categories,
             onAddItem: function(room) { setAddingRoom(room); },
+            onEditList: function(room) { setSelectedRoom(room); },
             onSelectRoom: function(r) { setSelectedRoom(r); }
           })
         ];
