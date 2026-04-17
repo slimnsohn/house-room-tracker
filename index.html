@@ -1079,6 +1079,69 @@
       );
     }
 
+    // ── DotScrubber ───────────────────────────────────────────────────────
+    function DotScrubber(props) {
+      var rooms = props.rooms, idx = props.idx, onIndexChange = props.onIndexChange;
+      var containerRef = useRef(null);
+      var isDragging = useRef(false);
+
+      function getIndexFromEvent(e) {
+        var container = containerRef.current;
+        if (!container) return idx;
+        var rect = container.getBoundingClientRect();
+        var touch = e.touches ? e.touches[0] : e;
+        var x = touch.clientX - rect.left;
+        var dotWidth = rect.width / rooms.length;
+        var newIdx = Math.floor(x / dotWidth);
+        return Math.max(0, Math.min(rooms.length - 1, newIdx));
+      }
+
+      function onStart(e) {
+        isDragging.current = true;
+        var newIdx = getIndexFromEvent(e);
+        if (newIdx !== idx) onIndexChange(newIdx);
+      }
+
+      function onMove(e) {
+        if (!isDragging.current) return;
+        if (e.cancelable) e.preventDefault();
+        var newIdx = getIndexFromEvent(e);
+        if (newIdx !== idx) onIndexChange(newIdx);
+      }
+
+      function onEnd() {
+        isDragging.current = false;
+      }
+
+      useEffect(function() {
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchend', onEnd);
+        return function() {
+          window.removeEventListener('mouseup', onEnd);
+          window.removeEventListener('touchend', onEnd);
+        };
+      }, []);
+
+      return h('div', {
+        ref: containerRef,
+        className: 'dots',
+        onMouseDown: onStart,
+        onMouseMove: onMove,
+        onTouchStart: onStart,
+        onTouchMove: onMove,
+        style: { cursor: 'pointer', touchAction: 'none', padding: '16px 20px' }
+      },
+        rooms.map(function(r, i) {
+          var dotColor = i === idx ? ROOM_COLORS[getRoomType(r.name)].accent : null;
+          return h('div', {
+            key: r.id || i,
+            className: 'dot' + (i === idx ? ' active' : ''),
+            style: dotColor ? { background: dotColor } : null
+          });
+        })
+      );
+    }
+
     // ── Carousel ─────────────────────────────────────────────────────────
     function Carousel(props) {
       var rooms = props.rooms, items = props.items, onSelectRoom = props.onSelectRoom;
@@ -1182,12 +1245,7 @@
             onTap: function() { onSelectRoom(rooms[idx]); }
           })
         ),
-        h('div', { className: 'dots' },
-          rooms.map(function(r, i) {
-            var dotColor = i === idx ? ROOM_COLORS[getRoomType(r.name)].accent : null;
-            return h('div', { key: r.id, className: 'dot' + (i === idx ? ' active' : ''), style: dotColor ? { background: dotColor } : null });
-          })
-        )
+        h(DotScrubber, { rooms: rooms, idx: idx, onIndexChange: function(i) { setSnapping(true); setIdx(i); } })
       );
     }
 
@@ -1738,13 +1796,6 @@
             })
           ];
         }
-      } else if (tab === 'summary') {
-        content = [
-          h('div', { key: 'header', className: 'app-header' },
-            h('h1', null, 'Summary')
-          ),
-          h(SummaryView, { key: 'summary', rooms: rooms, items: items, categories: categories })
-        ];
       } else if (tab === 'settings') {
         content = [
           h('div', { key: 'header', className: 'app-header' },
@@ -1760,10 +1811,6 @@
           h('button', { className: 'tab-btn' + (tab === 'rooms' ? ' active' : ''), onClick: function() { setTab('rooms'); setSelectedRoom(null); } },
             h('span', { className: 'tab-icon' }, '\uD83C\uDFE0'),
             h('span', { className: 'tab-label' }, 'Rooms')
-          ),
-          h('button', { className: 'tab-btn' + (tab === 'summary' ? ' active' : ''), onClick: function() { setTab('summary'); } },
-            h('span', { className: 'tab-icon' }, '\uD83D\uDCCA'),
-            h('span', { className: 'tab-label' }, 'Summary')
           ),
           h('button', { className: 'tab-btn' + (tab === 'settings' ? ' active' : ''), onClick: function() { setTab('settings'); } },
             h('span', { className: 'tab-icon' }, '\u2699\uFE0F'),
