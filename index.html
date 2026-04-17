@@ -1891,6 +1891,80 @@
     }
 
     // ── AllItemsView ─────────────────────────────────────────────────────
+    // ── SwipeableRow ────────────────────────────────────────────────────
+    function SwipeableRow(props) {
+      var onDelete = props.onDelete, children = props.children;
+      var _offset = useState(0), offset = _offset[0], setOffset = _offset[1];
+      var _revealed = useState(false), revealed = _revealed[0], setRevealed = _revealed[1];
+      var startX = useRef(0);
+      var startY = useRef(0);
+      var dragging = useRef(false);
+      var isHoriz = useRef(null);
+
+      function onStart(e) {
+        var t = e.touches ? e.touches[0] : e;
+        startX.current = t.clientX;
+        startY.current = t.clientY;
+        dragging.current = true;
+        isHoriz.current = null;
+      }
+
+      function onMove(e) {
+        if (!dragging.current) return;
+        var t = e.touches ? e.touches[0] : e;
+        var dx = t.clientX - startX.current;
+        var dy = t.clientY - startY.current;
+        if (isHoriz.current === null) {
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            isHoriz.current = Math.abs(dx) > Math.abs(dy);
+          }
+          return;
+        }
+        if (!isHoriz.current) return;
+        if (e.cancelable) e.preventDefault();
+        var newOffset = revealed ? Math.min(0, dx - 80) : Math.min(0, dx);
+        setOffset(newOffset);
+      }
+
+      function onEnd() {
+        if (!dragging.current) return;
+        dragging.current = false;
+        if (offset < -120) {
+          // Swiped far enough — delete
+          setOffset(-400);
+          setTimeout(function() { onDelete(); }, 200);
+        } else if (offset < -40) {
+          setOffset(-80);
+          setRevealed(true);
+        } else {
+          setOffset(0);
+          setRevealed(false);
+        }
+      }
+
+      return h('div', { style: { position: 'relative', overflow: 'hidden', borderRadius: '10px', marginBottom: '6px' } },
+        h('div', { style: {
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: '80px',
+          background: '#f85149', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: '13px', fontWeight: '600', borderRadius: '0 10px 10px 0'
+        } }, 'Delete'),
+        h('div', {
+          style: {
+            transform: 'translateX(' + offset + 'px)',
+            transition: dragging.current ? 'none' : 'transform 0.2s ease-out',
+            position: 'relative', zIndex: 1
+          },
+          onTouchStart: onStart,
+          onTouchMove: onMove,
+          onTouchEnd: onEnd,
+          onMouseDown: onStart,
+          onMouseMove: onMove,
+          onMouseUp: onEnd,
+          onMouseLeave: onEnd
+        }, children)
+      );
+    }
+
     function AllItemsView(props) {
       var rooms = props.rooms, items = props.items, categories = props.categories;
       var onBack = props.onBack, onItemsChanged = props.onItemsChanged;
@@ -1899,6 +1973,15 @@
       function showToast(msg) {
         setToast(msg);
         setTimeout(function() { setToast(null); }, 2500);
+      }
+
+      function deleteItem(item) {
+        var itemId = item.item_id || item.id;
+        onItemsChanged(itemId, null);
+        showToast('Deleted "' + item.description + '"');
+        api.deleteItem(itemId).catch(function(err) {
+          showToast('Failed to delete: ' + err.message);
+        });
       }
 
       function toggleItem(item) {
@@ -1940,25 +2023,27 @@
               roomItems.map(function(item) {
                 var cat = categories[item.category] || {};
                 var priorityColors = { must: '#f85149', should: '#d29922', nice: '#3fb950' };
-                return h('div', { key: item.item_id || item.id, style: {
-                  display: 'flex', alignItems: 'flex-start', gap: '10px',
-                  padding: '10px 12px', background: 'var(--surface)',
-                  borderRadius: '10px', marginBottom: '6px'
-                } },
-                  h('button', {
-                    className: 'checkbox',
-                    onClick: function() { toggleItem(item); }
-                  }),
-                  h('div', { style: { flex: 1, minWidth: 0 } },
-                    h('div', { style: { fontSize: '14px', color: 'var(--text)' } }, item.description),
-                    item.notes && h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' } }, item.notes),
-                    h('div', { style: { display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' } },
-                      item.category && h('span', { className: 'chip category' }, (cat.icon_emoji || '') + ' ' + item.category),
-                      item.priority && h('span', { className: 'chip priority-' + item.priority }, item.priority),
-                      item.cost_estimate && h('span', { style: { fontSize: '12px', fontFamily: "'DM Mono', monospace", color: 'var(--text-muted)' } }, formatCost(item.cost_estimate))
-                    )
-                  ),
-                  h('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: priorityColors[item.priority] || '#555', flexShrink: 0, marginTop: '6px' } })
+                return h(SwipeableRow, { key: item.item_id || item.id, onDelete: function() { deleteItem(item); } },
+                  h('div', { style: {
+                    display: 'flex', alignItems: 'flex-start', gap: '10px',
+                    padding: '10px 12px', background: 'var(--surface)',
+                    borderRadius: '10px'
+                  } },
+                    h('button', {
+                      className: 'checkbox',
+                      onClick: function() { toggleItem(item); }
+                    }),
+                    h('div', { style: { flex: 1, minWidth: 0 } },
+                      h('div', { style: { fontSize: '14px', color: 'var(--text)' } }, item.description),
+                      item.notes && h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' } }, item.notes),
+                      h('div', { style: { display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' } },
+                        item.category && h('span', { className: 'chip category' }, (cat.icon_emoji || '') + ' ' + item.category),
+                        item.priority && h('span', { className: 'chip priority-' + item.priority }, item.priority),
+                        item.cost_estimate && h('span', { style: { fontSize: '12px', fontFamily: "'DM Mono', monospace", color: 'var(--text-muted)' } }, formatCost(item.cost_estimate))
+                      )
+                    ),
+                    h('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: priorityColors[item.priority] || '#555', flexShrink: 0, marginTop: '6px' } })
+                  )
                 );
               })
             );
