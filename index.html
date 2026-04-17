@@ -961,18 +961,33 @@
     // ── API ──────────────────────────────────────────────────────────────
     const api = {
       async bootstrap() {
-        const res = await fetch(CONFIG.API_URL + '?token=' + encodeURIComponent(CONFIG.AUTH_TOKEN));
-        const data = await res.json();
+        const res = await fetch(CONFIG.API_URL + '?token=' + encodeURIComponent(CONFIG.AUTH_TOKEN), {
+          redirect: 'follow',
+          credentials: 'omit'
+        });
+        const text = await res.text();
+        var data;
+        try { data = JSON.parse(text); } catch(e) {
+          console.error('API returned non-JSON:', text.substring(0, 500));
+          throw new Error('API returned invalid response — check console');
+        }
         if (!data.ok) throw new Error(data.error || 'Bootstrap failed');
         return data;
       },
       async post(action, payload) {
         const res = await fetch(CONFIG.API_URL, {
           method: 'POST',
+          redirect: 'follow',
+          credentials: 'omit',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ ...payload, action, token: CONFIG.AUTH_TOKEN })
         });
-        const data = await res.json();
+        const text = await res.text();
+        var data;
+        try { data = JSON.parse(text); } catch(e) {
+          console.error('API returned non-JSON:', text.substring(0, 500));
+          throw new Error('POST returned invalid response — check console');
+        }
         if (!data.ok) throw new Error(data.error || action + ' failed');
         return data;
       },
