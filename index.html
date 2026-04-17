@@ -1073,6 +1073,16 @@
       return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
     }
 
+    function formatFloor(val) {
+      if (!val && val !== 0) return 'Main';
+      var v = String(val).trim();
+      if (v === '0' || v.toLowerCase() === 'basement') return 'Basement';
+      if (v === '1') return '1st Floor';
+      if (v === '2') return '2nd Floor';
+      if (v === '3') return '3rd Floor';
+      return v;
+    }
+
     function getDriveImageUrl(url) {
       if (!url) return null;
       var match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -1125,7 +1135,7 @@
         h('div', { className: 'room-card-body' },
           h('div', { className: 'room-card-top' },
             h('span', { className: 'room-card-name' }, room.name),
-            h('span', { className: 'floor-pill' }, room.floor || 'Main'),
+            h('span', { className: 'floor-pill' }, formatFloor(room.floor)),
             h('span', { className: 'floor-pill', style: { background: colors.bg, color: colors.accent, border: '1px solid ' + colors.border } }, colors.label)
           ),
           h('div', { className: 'progress-bar-track' },
@@ -1585,7 +1595,7 @@
           h('button', { className: 'back-btn', onClick: onBack }, '\u2190'),
           h('div', { style: { flex: 1 } },
             h('div', { className: 'room-detail-title' }, room.name),
-            h('div', { className: 'room-detail-meta' }, (room.floor || 'Main') + ' \u00B7 ' + completed + '/' + localItems.length + ' done')
+            h('div', { className: 'room-detail-meta' }, (formatFloor(room.floor)) + ' \u00B7 ' + completed + '/' + localItems.length + ' done')
           )
         ),
         h('div', { className: 'filter-bar' },
@@ -1864,9 +1874,17 @@
               })
             )
           ),
-          h('div', { className: 'form-actions', style: { marginTop: '20px' } },
-            h('button', { className: 'btn-secondary', onClick: onClose, style: { fontSize: '15px' } }, 'Cancel'),
-            h('button', { className: 'btn-primary', onClick: submit, style: { fontSize: '15px' } }, 'Add Item')
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: '20px', gap: '40px' } },
+            h('button', { onClick: onClose, style: {
+              background: 'rgba(248,81,73,0.12)', border: '1px solid rgba(248,81,73,0.3)',
+              color: '#f85149', padding: '12px 24px', borderRadius: '10px', fontSize: '15px',
+              fontWeight: '600', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
+            } }, 'Cancel'),
+            h('button', { onClick: submit, style: {
+              background: 'rgba(63,185,80,0.15)', border: '1px solid rgba(63,185,80,0.3)',
+              color: '#3fb950', padding: '12px 24px', borderRadius: '10px', fontSize: '15px',
+              fontWeight: '600', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', minHeight: '44px'
+            } }, 'Add Item')
           )
         )
       );
