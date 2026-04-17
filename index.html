@@ -296,7 +296,9 @@
       display: flex;
       gap: 8px;
       justify-content: center;
-      padding: 16px 0;
+      padding: 24px 0;
+      margin-top: auto;
+      padding-bottom: 8px;
     }
 
     .dot {
@@ -1112,7 +1114,7 @@
     // ── RoomCard ─────────────────────────────────────────────────────────
     function RoomCard(props) {
       var room = props.room, items = props.items, onAddItem = props.onAddItem, style = props.style;
-      var roomItems = items.filter(function(i) { return i.room_id === room.id; });
+      var roomItems = items.filter(function(i) { return i.room_id === room.room_id; });
       var total = roomItems.length;
       var completed = roomItems.filter(function(i) { return i.status === 'completed'; }).length;
       var pct = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -1166,7 +1168,7 @@
           return h('div', { className: 'room-card-items-preview' },
             h('div', { className: 'preview-label' }, openItems.length > 0 ? 'Open items' : 'All done!'),
             openItems.map(function(item) {
-              return h('div', { key: item.item_id || item.id, className: 'preview-item' },
+              return h('div', { key: item.item_id, className: 'preview-item' },
                 h('span', { className: 'preview-dot', style: { background: priorityColors[item.priority] || '#555' } }),
                 h('span', { className: 'preview-text' }, item.description)
               );
@@ -1232,7 +1234,7 @@
         rooms.map(function(r, i) {
           var dotColor = i === idx ? ROOM_COLORS[getRoomType(r.name)].accent : null;
           return h('div', {
-            key: r.id || i,
+            key: r.room_id || i,
             className: 'dot' + (i === idx ? ' active' : ''),
             style: dotColor ? { background: dotColor } : null
           });
@@ -1475,7 +1477,7 @@
     // ── RoomDetail ───────────────────────────────────────────────────────
     function RoomDetail(props) {
       var room = props.room, categories = props.categories, onBack = props.onBack, onItemsChanged = props.onItemsChanged;
-      var _items = useState(props.items.filter(function(i) { return i.room_id === room.id; }));
+      var _items = useState(props.items.filter(function(i) { return i.room_id === room.room_id; }));
       var localItems = _items[0], setLocalItems = _items[1];
       var _filter = useState('all');
       var filter = _filter[0], setFilter = _filter[1];
@@ -1492,8 +1494,8 @@
 
       // Sync with parent items
       useEffect(function() {
-        setLocalItems(props.items.filter(function(i) { return i.room_id === room.id; }));
-      }, [props.items, room.id]);
+        setLocalItems(props.items.filter(function(i) { return i.room_id === room.room_id; }));
+      }, [props.items, room.room_id]);
 
       function showToast(msg) {
         setToast(msg);
@@ -1521,10 +1523,10 @@
         var newStatus = item.status === 'completed' ? 'not_started' : 'completed';
         var prev = localItems.slice();
         setLocalItems(function(list) {
-          return list.map(function(i) { return i.id === item.id ? Object.assign({}, i, { status: newStatus }) : i; });
+          return list.map(function(i) { return i.item_id === item.item_id ? Object.assign({}, i, { status: newStatus }) : i; });
         });
-        api.updateItem(item.id, { status: newStatus }).then(function() {
-          onItemsChanged(item.id, { status: newStatus });
+        api.updateItem(item.item_id, { status: newStatus }).then(function() {
+          onItemsChanged(item.item_id, { status: newStatus });
         }).catch(function(err) {
           setLocalItems(prev);
           showToast('Failed to update: ' + err.message);
@@ -1533,10 +1535,10 @@
 
       function handleDelete(item) {
         var prev = localItems.slice();
-        setLocalItems(function(list) { return list.filter(function(i) { return i.id !== item.id; }); });
+        setLocalItems(function(list) { return list.filter(function(i) { return i.item_id !== item.item_id; }); });
         showToast('Item deleted');
-        api.deleteItem(item.id).then(function() {
-          onItemsChanged(item.id, null); // null = deleted
+        api.deleteItem(item.item_id).then(function() {
+          onItemsChanged(item.item_id, null); // null = deleted
         }).catch(function(err) {
           setLocalItems(prev);
           showToast('Delete failed: ' + err.message);
@@ -1544,10 +1546,10 @@
       }
 
       function handleEditSave(fields) {
-        var itemId = editing.id;
+        var itemId = editing.item_id;
         var prev = localItems.slice();
         setLocalItems(function(list) {
-          return list.map(function(i) { return i.id === itemId ? Object.assign({}, i, fields) : i; });
+          return list.map(function(i) { return i.item_id === itemId ? Object.assign({}, i, fields) : i; });
         });
         setEditing(null);
         api.updateItem(itemId, fields).then(function() {
@@ -1562,7 +1564,7 @@
         if (!newDesc.trim()) return;
         var newItem = {
           id: uuid(),
-          room_id: room.id,
+          room_id: room.room_id,
           description: newDesc.trim(),
           category: newCat,
           priority: newPri,
@@ -1577,12 +1579,12 @@
         api.createItem(newItem).then(function(res) {
           if (res.item_id) {
             setLocalItems(function(list) {
-              return list.map(function(i) { return i.id === newItem.id ? Object.assign({}, i, { id: res.item_id }) : i; });
+              return list.map(function(i) { return i.item_id === newItem.item_id ? Object.assign({}, i, { id: res.item_id }) : i; });
             });
           }
           onItemsChanged(null, newItem); // null id = new
         }).catch(function(err) {
-          setLocalItems(function(list) { return list.filter(function(i) { return i.id !== newItem.id; }); });
+          setLocalItems(function(list) { return list.filter(function(i) { return i.item_id !== newItem.item_id; }); });
           showToast('Add failed: ' + err.message);
         });
       }
@@ -1621,7 +1623,7 @@
               )
             : filtered.map(function(item) {
                 return h(ItemRow, {
-                  key: item.id,
+                  key: item.item_id,
                   item: item,
                   categories: categories,
                   onToggle: handleToggle,
@@ -1678,7 +1680,7 @@
       });
 
       var roomMap = {};
-      rooms.forEach(function(r) { roomMap[r.id] = r.name; });
+      rooms.forEach(function(r) { roomMap[r.room_id] = r.name; });
 
       function exportCsv() {
         var headers = ['Room', 'Category', 'Description', 'Status', 'Priority', 'Est. Cost', 'Actual Cost', 'Vendor', 'Notes'];
@@ -1737,7 +1739,7 @@
                   h('span', null, '(' + grouped[cat].length + ')')
                 ),
                 grouped[cat].map(function(item) {
-                  return h('div', { key: item.id, className: 'shopping-list-item' },
+                  return h('div', { key: item.item_id, className: 'shopping-list-item' },
                     h('span', null, item.description),
                     h('span', { className: 'room-tag' }, roomMap[item.room_id] || '')
                   );
@@ -1817,7 +1819,7 @@
         if (!desc.trim()) return;
         var item = {
           item_id: uuid(),
-          room_id: room.room_id || room.id,
+          room_id: room.room_id,
           category: '',
           description: desc.trim(),
           status: 'not_started',
@@ -1977,7 +1979,7 @@
       }
 
       function deleteItem(item) {
-        var itemId = item.item_id || item.id;
+        var itemId = item.item_id;
         onItemsChanged(itemId, null);
         showToast('Deleted "' + item.description + '"');
         api.deleteItem(itemId).catch(function(err) {
@@ -1987,15 +1989,15 @@
 
       function toggleItem(item) {
         var newStatus = item.status === 'completed' ? 'not_started' : 'completed';
-        onItemsChanged(item.item_id || item.id, { status: newStatus });
-        api.updateItem(item.item_id || item.id, { status: newStatus }).catch(function(err) {
+        onItemsChanged(item.item_id, { status: newStatus });
+        api.updateItem(item.item_id, { status: newStatus }).catch(function(err) {
           showToast('Failed: ' + err.message);
         });
       }
 
       // Build room map
       var roomMap = {};
-      rooms.forEach(function(r) { roomMap[r.room_id || r.id] = r; });
+      rooms.forEach(function(r) { roomMap[r.room_id] = r; });
 
       return h('div', { className: 'room-detail' },
         h('div', { className: 'room-detail-header' },
@@ -2007,7 +2009,7 @@
         ),
         h('div', { className: 'item-list', style: { padding: '16px' } },
           rooms.map(function(room) {
-            var roomId = room.room_id || room.id;
+            var roomId = room.room_id;
             var roomItems = items.filter(function(i) { return (i.room_id || '') === roomId && i.status !== 'completed'; });
             if (roomItems.length === 0) return null;
             var colors = ROOM_COLORS[getRoomType(room.name)];
@@ -2024,7 +2026,7 @@
               roomItems.map(function(item) {
                 var cat = categories[item.category] || {};
                 var priorityColors = { must: '#f85149', should: '#d29922', nice: '#3fb950' };
-                return h(SwipeableRow, { key: item.item_id || item.id, onDelete: function() { deleteItem(item); } },
+                return h(SwipeableRow, { key: item.item_id, onDelete: function() { deleteItem(item); } },
                   h('div', { style: {
                     display: 'flex', alignItems: 'flex-start', gap: '10px',
                     padding: '10px 12px', background: 'var(--surface)',
@@ -2130,14 +2132,14 @@
       function handleItemsChanged(itemId, fieldsOrItem) {
         if (fieldsOrItem === null) {
           // Deleted
-          setItems(function(list) { return list.filter(function(i) { return i.id !== itemId; }); });
+          setItems(function(list) { return list.filter(function(i) { return i.item_id !== itemId; }); });
         } else if (itemId === null) {
           // New item
           setItems(function(list) { return list.concat([fieldsOrItem]); });
         } else {
           // Updated
           setItems(function(list) {
-            return list.map(function(i) { return i.id === itemId ? Object.assign({}, i, fieldsOrItem) : i; });
+            return list.map(function(i) { return i.item_id === itemId ? Object.assign({}, i, fieldsOrItem) : i; });
           });
         }
       }
@@ -2210,7 +2212,7 @@
           onAdd: function(item) {
             setItems(function(list) { return list.concat([item]); });
             api.createItem(item).catch(function(err) {
-              setItems(function(list) { return list.filter(function(i) { return (i.item_id || i.id) !== (item.item_id || item.id); }); });
+              setItems(function(list) { return list.filter(function(i) { return i.item_id !== (item.item_id); }); });
             });
           },
           onClose: function() { setAddingRoom(null); }
