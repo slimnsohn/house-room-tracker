@@ -1255,12 +1255,12 @@
       function swipeNav(dir) {
         if (animating) return;
         setAnimating(true);
-        setDragOffset(dir === 'left' ? -250 : 250);
+        setDragOffset(dir === 'left' ? -300 : 300);
         setTimeout(function() {
-          goTo(dir === 'left' ? idx + 1 : idx - 1);
           setDragOffset(0);
-          setTimeout(function() { setAnimating(false); }, 50);
-        }, 150);
+          goTo(dir === 'left' ? idx + 1 : idx - 1);
+          setAnimating(false);
+        }, 250);
       }
 
       var handleStart = useCallback(function(e) {
@@ -1315,7 +1315,7 @@
       var cardStyle = {
         transform: 'translateX(' + dragOffset + 'px) rotate(' + (dragOffset * 0.03) + 'deg)',
         opacity: Math.max(0.5, 1 - Math.abs(dragOffset) / 500),
-        transition: (isDragging.current && isHorizontal.current) ? 'none' : 'all 0.15s ease-out'
+        transition: (isDragging.current && isHorizontal.current) ? 'none' : 'all 0.25s ease-out'
       };
 
       return h('div', { className: 'carousel-container' },
