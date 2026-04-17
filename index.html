@@ -1019,6 +1019,21 @@
       return url;
     }
 
+    // Room type color coding
+    var ROOM_COLORS = {
+      bedroom: { accent: '#7c6ee6', bg: 'rgba(124,110,230,0.12)', border: 'rgba(124,110,230,0.3)', label: 'Bedroom' },
+      bathroom: { accent: '#4ac1e0', bg: 'rgba(74,193,224,0.12)', border: 'rgba(74,193,224,0.3)', label: 'Bathroom' },
+      shared:   { accent: '#e6a44c', bg: 'rgba(230,164,76,0.12)', border: 'rgba(230,164,76,0.3)', label: 'Shared' }
+    };
+
+    function getRoomType(name) {
+      if (!name) return 'shared';
+      var n = name.toLowerCase();
+      if (n.match(/bed|master bed|guest bed|nursery|office/)) return 'bedroom';
+      if (n.match(/bath|powder|restroom|half bath|shower/)) return 'bathroom';
+      return 'shared';
+    }
+
     // ── Toast Context ───────────────────────────────────────────────────
     var toastTimeout = null;
 
@@ -1035,15 +1050,22 @@
         .reduce(function(sum, i) { return sum + (Number(i.cost_estimate) || 0); }, 0);
 
       var imgUrl = getDriveImageUrl(room.image_url);
+      var roomType = getRoomType(room.name);
+      var colors = ROOM_COLORS[roomType];
+      var cardStyle = Object.assign({}, style || {}, {
+        borderTop: '3px solid ' + colors.accent,
+        background: 'linear-gradient(180deg, ' + colors.bg + ' 0%, var(--surface) 40%)'
+      });
 
-      return h('div', { className: 'room-card', onClick: onTap, style: style },
+      return h('div', { className: 'room-card', onClick: onTap, style: cardStyle },
         imgUrl
           ? h('img', { className: 'room-card-hero', src: imgUrl, alt: room.name, loading: 'lazy' })
           : h('div', { className: 'room-card-hero-placeholder' }, room.name ? room.name[0] : '?'),
         h('div', { className: 'room-card-body' },
           h('div', { className: 'room-card-top' },
             h('span', { className: 'room-card-name' }, room.name),
-            h('span', { className: 'floor-pill' }, room.floor || 'Main')
+            h('span', { className: 'floor-pill' }, room.floor || 'Main'),
+            h('span', { className: 'floor-pill', style: { background: colors.bg, color: colors.accent, border: '1px solid ' + colors.border } }, colors.label)
           ),
           h('div', { className: 'progress-bar-track' },
             h('div', { className: 'progress-bar-fill', style: { width: pct + '%' } })
@@ -1111,10 +1133,10 @@
         var dx = currentX.current - startX.current;
 
         if (isHorizontal.current && Math.abs(dx) > 60) {
-          if (dx < 0 && idx < rooms.length - 1) {
-            setIdx(function(i) { return i + 1; });
-          } else if (dx > 0 && idx > 0) {
-            setIdx(function(i) { return i - 1; });
+          if (dx < 0) {
+            setIdx(function(i) { return i < rooms.length - 1 ? i + 1 : 0; });
+          } else {
+            setIdx(function(i) { return i > 0 ? i - 1 : rooms.length - 1; });
           }
         }
 
@@ -1135,13 +1157,13 @@
       };
 
       return h('div', { className: 'carousel-container' },
-        idx > 0 && h('button', {
+        rooms.length > 1 && h('button', {
           className: 'nav-arrow left',
-          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx - 1); }
+          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx > 0 ? idx - 1 : rooms.length - 1); }
         }, '\u2039'),
-        idx < rooms.length - 1 && h('button', {
+        rooms.length > 1 && h('button', {
           className: 'nav-arrow right',
-          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx + 1); }
+          onClick: function(e) { e.stopPropagation(); setSnapping(true); setIdx(idx < rooms.length - 1 ? idx + 1 : 0); }
         }, '\u203A'),
         h('div', {
           className: 'carousel-card-wrapper' + (snapping ? ' snapping' : ''),
@@ -1162,7 +1184,8 @@
         ),
         h('div', { className: 'dots' },
           rooms.map(function(r, i) {
-            return h('div', { key: r.id, className: 'dot' + (i === idx ? ' active' : '') });
+            var dotColor = i === idx ? ROOM_COLORS[getRoomType(r.name)].accent : null;
+            return h('div', { key: r.id, className: 'dot' + (i === idx ? ' active' : ''), style: dotColor ? { background: dotColor } : null });
           })
         )
       );
