@@ -317,15 +317,15 @@
     /* Nav Arrows */
     .nav-arrow {
       position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 40px;
-      height: 40px;
+      top: 105px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-size: 18px;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      border: none;
+      color: #fff;
+      font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -336,9 +336,9 @@
       min-width: 44px;
     }
 
-    .nav-arrow:hover { background: rgba(255,255,255,0.14); }
-    .nav-arrow.left { left: 4px; }
-    .nav-arrow.right { right: 4px; }
+    .nav-arrow:hover { background: rgba(0,0,0,0.6); }
+    .nav-arrow.left { left: -6px; }
+    .nav-arrow.right { right: -6px; }
 
     /* Room Detail */
     .room-detail {
@@ -1342,17 +1342,9 @@
       };
 
       return h('div', { className: 'carousel-container' },
-        rooms.length > 1 && h('button', {
-          className: 'nav-arrow left',
-          onClick: function(e) { e.stopPropagation(); swipeNav('right'); }
-        }, '\u2039'),
-        rooms.length > 1 && h('button', {
-          className: 'nav-arrow right',
-          onClick: function(e) { e.stopPropagation(); swipeNav('left'); }
-        }, '\u203A'),
         h('div', {
           className: 'carousel-card-wrapper',
-          style: cardStyle,
+          style: Object.assign({ position: 'relative' }, cardStyle),
           onMouseDown: handleStart,
           onMouseMove: handleMove,
           onMouseUp: handleEnd,
@@ -1361,6 +1353,14 @@
           onTouchMove: handleMove,
           onTouchEnd: handleEnd
         },
+          rooms.length > 1 && h('button', {
+            className: 'nav-arrow left',
+            onClick: function(e) { e.stopPropagation(); swipeNav('right'); }
+          }, '\u2039'),
+          rooms.length > 1 && h('button', {
+            className: 'nav-arrow right',
+            onClick: function(e) { e.stopPropagation(); swipeNav('left'); }
+          }, '\u203A'),
           h(RoomCard, {
             room: rooms[idx],
             items: items,
